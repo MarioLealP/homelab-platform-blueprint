@@ -28,22 +28,30 @@ growing fleet manageable.
 
 1. **Defined in the repository.** A service is a directory with a compose file
    and its configuration. Nothing runs that is not committed.
-2. **No host ports unless externally required.** Services talk to each other on
-   internal networks. Only the reverse proxy and deliberately port-forwarded
-   workloads (game servers, VPN) publish host ports.
+2. **No host ports unless externally required.** Each app sits on its own
+   network shared only with the reverse proxy. Only deliberately forwarded
+   non-HTTP workloads (game servers, VPN) publish ports to the outside.
+   Public web arrives through an outbound tunnel, not an open port.
 3. **Reached through the edge.** User-facing HTTP is routed by the reverse proxy,
    which terminates TLS and applies authentication policy.
-4. **Secrets are external.** Configuration in the repo is non-secret. Secrets are
-   injected at deploy time from an encrypted store and never committed in clear.
+4. **Secrets are never in clear.** Secrets are committed only in encrypted form
+   and rendered at deploy time. Human passwords live in a separate offline
+   password manager.
 5. **State is on a known path.** Anything that must survive a container rebuild
    lives under one predictable data root, so the backup agent has exactly one
    tree to snapshot.
 6. **Least privilege.** Containers run as non-root where the image allows, drop
    capabilities they do not need, and mount the Docker socket only if their
    function genuinely requires it.
-7. **Pinned and aged.** Image tags are pinned to a version, not `latest`.
-   Dependency updates arrive as reviewable change proposals with a minimum
-   release age, not automatically on publish.
+7. **Pinned and aged.** Image tags are pinned to a version, not `latest`, and
+   app releases are pinned by digest. Dependency updates arrive as pull
+   requests after a minimum release age, never automatically on publish.
+8. **Machines have names, not passwords.** Service-to-service and
+   agent-to-server calls authenticate with short-lived certificates that carry
+   a specific workload identity, not shared bearer tokens.
+9. **Changes that widen power wait for a human.** Routine changes merge
+   themselves. Anything touching the security boundary, the deploy machinery
+   or a service's access to the host waits for the operator.
 
 ## Roles
 
@@ -51,4 +59,5 @@ growing fleet manageable.
 | --- | --- | --- |
 | **User** | Public and SSO-gated apps | Public internet → edge |
 | **Operator** | Everything, including admin surfaces | VPN → internal networks |
-| **Automation** | Deploy loop, backups, monitoring | Runs on-node, scoped permissions |
+| **Automation** | Deploy loop, CI roles, backups, monitoring | Separate system users, scoped permissions, audited |
+| **Workloads** | The specific services they are allowed to call | Client certificate with their own identity |

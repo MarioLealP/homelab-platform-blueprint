@@ -1,6 +1,6 @@
 # ADR 0004 · The git repository is the single source of truth
 
-**Status:** accepted
+**Status:** accepted · amended by ADR&nbsp;0008 (locked `main`, merge gate, automatic revert on failed checks)
 
 ## Context
 

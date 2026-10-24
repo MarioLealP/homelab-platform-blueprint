@@ -40,9 +40,47 @@ flowchart TB
 
 ## Uptime
 
-The external monitor is off-node and off-network on purpose — if the node's
-internet drops, something still notices. It checks the handful of public
-endpoints that matter and the VPN endpoint.
+Public routes are checked **through the public path**: resolved via public DNS
+and fetched through the edge provider, not over the LAN. A LAN check can pass
+while the public route is broken. A truly off-node monitor that notices when
+the whole node or uplink is down is the next step.
+
+## Security detection
+
+Detection gets the same "one job per tool" treatment as everything else:
+
+| Layer | Job | Acts? |
+| --- | --- | --- |
+| Health / metrics | is it up, is it healthy, did the job run | alerts |
+| Log store | everything searchable, bounded retention | no |
+| Host IDS (HIDS) | file integrity, vulnerable packages, config benchmarks, auth anomalies, privileged-command audit trail | alerts |
+| Network IDS | traffic signatures to and from the node | **detect only** |
+| Edge IPS + WAF | internet-facing request filtering and IP reputation | **blocks** |
+| Static blocklists | known-bad networks dropped at the host firewall | blocks |
+
+Only the edge tooling and static lists block automatically. Detect-only tools
+raise alerts, and a person or a triage step decides. An automatic ban based on
+an IDS signature is how a homelab locks its operator out.
+
+**Exposure is checked from the outside in**, on a schedule:
+
+- a passive lookup of what the internet can see on the public IP, alerting on
+  any open service;
+- a vulnerability scan of every running image, alerting on fixable high and
+  critical findings;
+- expiry alerts for every certificate that matters: the CA chain, the vault
+  listener, the IdP signing certificate.
+
+**Triage can be automated, but read-only.** An automated responder may read
+alerts, search logs and query monitoring through accounts that cannot change
+anything. Low-severity noise expires after a couple of days. Attack-type
+findings never expire without a person looking at them.
+
+## One alert sink
+
+Every source above, plus CI, backups and deploys, alerts into **one push
+channel**. There are no side channels. A new tool that wants to alert routes
+into the same sink or into the health system.
 
 ## What is deliberately not done
 

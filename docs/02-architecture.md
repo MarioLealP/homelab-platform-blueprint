@@ -16,15 +16,18 @@ flowchart TB
 
     platform[["Homelab Platform<br/>(single node)"]]
 
-    user -->|HTTPS| dns --> platform
+    platform -->|outbound tunnel| dns
+    user -->|HTTPS| dns
     operator -->|VPN| platform
     platform -->|encrypted snapshots| offsite
     platform -->|pull images / check updates| upstream
 ```
 
-The platform trusts: the operator over VPN, and the git repository. It does not
-trust: the public internet, an authenticated user's device, or an image tag it
-has not pinned.
+The platform trusts: the operator over VPN with an SSO admin login, the git
+repository's locked `main`, and workloads that present a certificate for the
+exact identity expected. It does not trust: the public internet, an
+authenticated user's device, CI build output, or an image it has not pinned by
+digest.
 
 ## Containers
 
@@ -38,7 +41,7 @@ flowchart TB
             idp[Identity provider]
         end
 
-        subgraph appnet [app network]
+        subgraph appnet [one front network per app · shared only with the proxy]
             app1[App A · public]
             app2[App B · SSO-gated]
             app3[App C · SSO-gated]
@@ -56,9 +59,10 @@ flowchart TB
         end
 
         subgraph opsnet [ops]
-            deployer[Deploy agent<br/>watches git]
+            deployer[Deploy agent<br/>watches git · auto-reverts]
             backup[Backup agent]
             monitor[Metrics + alerts]
+            vault[Vault / private CA]
         end
     end
 
@@ -87,14 +91,16 @@ flowchart TB
 - **Edge plane** — the reverse proxy and the identity provider. The only
   containers that receive traffic that originated outside the node.
 - **Application plane** — the services themselves, split by whether they are
-  public or require SSO. Apps never talk to each other directly; if they need
-  to, they go through the edge or a defined API.
+  public or require SSO. Each app has its own network with the proxy. Apps
+  never share a network by accident. When one must call another, the link is a
+  named network or a machine hostname, authenticated with mutual TLS.
 - **Data plane** — databases and storage, on a network with **no outbound
   route**. Reachable only from the specific apps that own the data.
 - **Admin plane** — management UIs. On their own network, never routed by the
   public edge, reachable only over VPN. See ADR&nbsp;0003.
-- **Ops plane** — the deploy agent, backup agent, and monitoring. On-node
-  automation with narrowly scoped permissions.
+- **Ops plane** — the deploy agent, backup agent, monitoring, and the vault
+  that issues workload certificates. On-node automation, each part under its
+  own system user with narrowly scoped permissions.
 
 ## Request path for a gated app
 

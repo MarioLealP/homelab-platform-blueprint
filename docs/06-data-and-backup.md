@@ -53,13 +53,26 @@ flowchart LR
 - **Retention is tiered.** Frequent snapshots kept for days, then thinned to
   daily, weekly, monthly.
 
+## Freshness is a deploy precondition
+
+Backup freshness is a monitored metric, with alerts when the frequent or full
+snapshot is overdue, and the deploy agent **refuses to deploy** while the
+last full backup is more than a day old. A change never lands on top of
+data that isn't backed up.
+
 ## Restore testing
 
-A backup that has never been restored is a hypothesis. On a schedule:
+A backup that has never been restored is a hypothesis. The levels, from
+cheapest to most convincing:
 
-1. Pull the latest snapshot into a scratch location.
-2. Stand up the service against the restored data.
-3. Assert it comes up healthy and the data is intact.
-4. Report pass/fail to monitoring.
+1. **Repository integrity:** the backup tool verifies its own repositories on a
+   schedule. *(automated)*
+2. **Restore drills:** pull a snapshot into a scratch location, stand the
+   service up against it, check that the data is intact. *(done by hand at
+   milestones, such as after a rebuild or a backup-design change)*
+3. **Scheduled restore tests:** level 2 on a timer, reporting pass/fail to
+   monitoring, so a failed restore pages the operator like an outage would.
+   *(the target, not yet automated)*
 
-A failed restore test pages the operator the same as a service outage would.
+Being honest about which level is actually in place is part of the design. A
+level-1 setup must not claim to be level 3.

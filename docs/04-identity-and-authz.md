@@ -31,9 +31,13 @@ flowchart TB
 
 ## MFA
 
-Second factor (TOTP or WebAuthn) is required for every account. It is enforced at
-the IdP, so it applies uniformly regardless of which service the user is heading
-for.
+A second factor (TOTP or WebAuthn) is required for every account. It is enforced
+at the IdP, so it applies uniformly regardless of which service the user is
+heading for.
+
+The **admin account is separate** from the operator's everyday account and
+signs in with a **passkey only** (phishing-resistant). A recovery path exists
+for break-glass, and it is reached over SSH, not the web.
 
 ## Authorisation
 
@@ -72,6 +76,29 @@ flowchart LR
 Once a service is wired to the IdP, its local login is **disabled**, not left as
 a fallback. A dual login path is an unmonitored way in that bypasses MFA and the
 central audit log. See ADR&nbsp;0002.
+
+## Session rules
+
+- **No bearer credentials in browser JavaScript.** Sessions are Secure,
+  HttpOnly, host-scoped cookies. Nothing a script on the page can read would
+  let an attacker replay the session.
+- **Short-lived access tokens** (minutes, not days), no `offline_access` for
+  ordinary apps, and a password change ends every session and token.
+- **Strict OAuth:** exact redirect URIs. Implicit, password and
+  client-credentials grants are refused.
+- **The proxy owns identity headers.** It strips any identity header the client
+  sends and sets them only after a successful auth check. Forward-auth is
+  scoped per application, never a parent-domain cookie.
+- **Long-lived connections are cut** after a bounded time, so a revoked session
+  cannot keep an old stream open.
+- **Logs are scrubbed:** OAuth codes and credential headers are redacted
+  before logs leave the node.
+
+## Machines
+
+People authenticate to the IdP. Machines do not. Services and agents use
+client certificates with a named workload identity. See
+[`08-secrets-and-workload-identity.md`](08-secrets-and-workload-identity.md).
 
 ## Naming
 
